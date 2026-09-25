@@ -173,6 +173,24 @@ LIBRARY MANAGEMENT/
 
 ## 🚀 Getting Started
 
+### Docker Compose Deployment
+
+The complete stack can be started with Docker Compose. It runs the React frontend, Spring Boot backend, MySQL, and Redis:
+
+```bash
+docker compose up --build -d
+```
+
+Open the frontend at **http://localhost:3000**. The backend API is available at **http://localhost:8080/api**.
+
+For a non-local deployment, set `VITE_API_URL`, `LIBRARY_CORS_ORIGINS`, and `LIBRARY_JWT_SECRET` in the Compose environment before building. Replace the development MySQL credentials with managed database credentials and do not commit production secrets.
+
+To stop the stack:
+
+```bash
+docker compose down
+```
+
 ### Prerequisites
 - Java 21 or higher
 - Maven 3.9+
