@@ -2,7 +2,7 @@ package com.library.management.controller;
 
 import com.library.management.model.Book;
 import com.library.management.model.IssuedBook;
-import com.library.management.service.LibraryService;
+import com.library.management.service.BookService;
 import java.util.List;
 import java.util.Map;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -21,8 +21,8 @@ import org.springframework.security.access.prepost.PreAuthorize;
 @RestController
 @RequestMapping("/api/books")
 public class BookController {
-    private final LibraryService service;
-    public BookController(LibraryService service) { this.service = service; }
+    private final BookService service;
+    public BookController(BookService service) { this.service = service; }
     @GetMapping
     public List<Book> getBooks(
             @RequestParam(required = false) String search,

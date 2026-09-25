@@ -3,9 +3,8 @@ package com.library.management.service;
 import com.library.management.exception.ApiException;
 import com.library.management.model.User;
 import java.security.SecureRandom;
+import java.time.Duration;
 import java.time.Instant;
-import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -16,17 +15,19 @@ public class AuthService {
     private final LibraryService libraryService;
     private final PasswordEncoder passwordEncoder;
     private final EmailService emailService;
+    private final RedisService redisService;
     private final long otpSeconds;
     private final boolean exposeOtp;
     private final SecureRandom random = new SecureRandom();
-    private final Map<String, Otp> otps = new ConcurrentHashMap<>();
 
     public AuthService(LibraryService libraryService, PasswordEncoder passwordEncoder, EmailService emailService,
+            RedisService redisService,
             @Value("${library.otp-seconds:600}") long otpSeconds,
             @Value("${library.expose-otp:false}") boolean exposeOtp) {
         this.libraryService = libraryService;
         this.passwordEncoder = passwordEncoder;
         this.emailService = emailService;
+        this.redisService = redisService;
         this.otpSeconds = otpSeconds;
         this.exposeOtp = exposeOtp;
     }
@@ -35,18 +36,21 @@ public class AuthService {
         String normalizedEmail = normalize(email);
         libraryService.findUserByEmail(normalizedEmail);
         String code = String.format("%06d", random.nextInt(1_000_000));
-        otps.put(key(normalizedEmail, purpose), new Otp(code, Instant.now().plusSeconds(otpSeconds)));
+        String otpKey = key(normalizedEmail, purpose);
+        redisService.setValue(otpKey, new Otp(code, Instant.now().plusSeconds(otpSeconds)), Duration.ofSeconds(otpSeconds));
         emailService.sendOtp(normalizedEmail, purpose, code);
         return exposeOtp ? code : "OTP sent to the registered email address";
     }
 
     public void verifyOtp(String email, String otp, String purpose) {
         String normalizedEmail = normalize(email);
-        Otp stored = otps.get(key(normalizedEmail, purpose));
+        String otpKey = key(normalizedEmail, purpose);
+        Otp stored = redisService.getValue(otpKey, Otp.class);
         if (stored == null || stored.expiresAt().isBefore(Instant.now()) || !stored.code().equals(otp)) {
+            redisService.delete(otpKey);
             throw new ApiException(HttpStatus.BAD_REQUEST, "Invalid or expired OTP");
         }
-        otps.remove(key(normalizedEmail, purpose));
+        redisService.delete(otpKey);
     }
 
     public User register(String name, String email, String phoneNumber, String password) {
@@ -75,6 +79,7 @@ public class AuthService {
     }
 
     private String normalize(String email) { return email == null ? "" : email.trim().toLowerCase(); }
-    private String key(String email, String purpose) { return purpose + ":" + email; }
-    private record Otp(String code, Instant expiresAt) { }
+    private String key(String email, String purpose) { return "otp:" + purpose + ":" + email; }
+
+    public record Otp(String code, Instant expiresAt) { }
 }

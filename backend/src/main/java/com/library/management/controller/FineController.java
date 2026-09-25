@@ -1,7 +1,7 @@
 package com.library.management.controller;
 
 import com.library.management.model.Fine;
-import com.library.management.service.LibraryService;
+import com.library.management.service.FineService;
 import java.util.List;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -13,9 +13,9 @@ import org.springframework.security.access.prepost.PreAuthorize;
 @RestController
 @RequestMapping("/api/fines")
 public class FineController {
-    private final LibraryService service;
+    private final FineService service;
 
-    public FineController(LibraryService service) { this.service = service; }
+    public FineController(FineService service) { this.service = service; }
 
     @GetMapping
     public List<Fine> getFines() { return service.getFines(); }
