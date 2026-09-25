@@ -29,6 +29,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.jdbc.core.JdbcTemplate;
 
 @Service
 public class LibraryService {
@@ -46,27 +47,28 @@ public class LibraryService {
     private final List<BorrowRecord> borrowingHistory = new ArrayList<>();
     private final Map<String, Fine> fines = new LinkedHashMap<>();
     private final double finePerDay;
+    private final JdbcTemplate jdbc;
 
     public LibraryService(
             @Value("${library.data-directory:data}") String dataDirectory,
-            @Value("${library.fine-per-day:1.0}") double finePerDay) {
+            @Value("${library.fine-per-day:1.0}") double finePerDay,
+            JdbcTemplate jdbc) {
         this.dataDirectory = Paths.get(dataDirectory);
         this.finePerDay = finePerDay;
+        this.jdbc = jdbc;
     }
 
     @PostConstruct
     public synchronized void load() {
-        try {
-            Files.createDirectories(dataDirectory);
-            readBooks();
-            readUsers();
-            readLoans();
-            readBorrowingHistory();
-            readFines();
-            syncBorrowedBooks();
-        } catch (IOException exception) {
-            throw new IllegalStateException("Unable to load library data", exception);
+        try { Files.createDirectories(dataDirectory); } catch (IOException exception) {
+            throw new IllegalStateException("Unable to initialize file storage", exception);
         }
+        readBooks();
+        readUsers();
+        readLoans();
+        readBorrowingHistory();
+        readFines();
+        syncBorrowedBooks();
     }
 
     public synchronized List<Book> getBooks() { return getBooks(null, null, null); }
@@ -326,13 +328,16 @@ public class LibraryService {
     }
 
     private void saveAll() {
-        try {
-            write("books.csv", BOOK_HEADER, books.values().stream().map(book -> csv(book.getId(), book.getTitle(), book.getAuthor(), book.getGenre(), book.getIsbn(), book.getType(), book.getFileFormat(), book.getDescription(), book.getPublisher(), String.valueOf(book.getPublicationYear()), book.getFileName(), book.getFileContentType(), book.getFilePath(), Boolean.toString(book.isAvailable()))).toList());
-            write("users.csv", USER_HEADER, users.values().stream().map(user -> csv(user.getId(), user.getName(), user.getEmail(), user.getPhoneNumber(), String.join(";", user.getBorrowedBooks()), user.getPasswordHash(), user.getRole(), Boolean.toString(user.isEmailVerified()))).toList());
-            write("loans.csv", LOAN_HEADER, loans.values().stream().map(loan -> csv(loan.userId(), loan.bookId(), loan.issuedDate().toString(), loan.dueDate().toString())).toList());
-            write("borrow-history.csv", HISTORY_HEADER, borrowingHistory.stream().map(record -> csv(record.getUserId(), record.getBookId(), record.getIssuedDate(), record.getDueDate(), record.getReturnedDate())).toList());
-            write("fines.csv", FINE_HEADER, fines.values().stream().map(fine -> csv(fine.getId(), fine.getUserId(), fine.getBookId(), Long.toString(fine.getOverdueDays()), Double.toString(fine.getAmount()), fine.getStatus())).toList());
-        } catch (IOException exception) { throw new IllegalStateException("Unable to save library data", exception); }
+        jdbc.update("DELETE FROM fines");
+        jdbc.update("DELETE FROM borrow_history");
+        jdbc.update("DELETE FROM loans");
+        jdbc.update("DELETE FROM books");
+        jdbc.update("DELETE FROM users");
+        users.values().forEach(user -> jdbc.update("INSERT INTO users (id,name,email,phone_number,password_hash,role,email_verified) VALUES (?,?,?,?,?,?,?)", user.getId(), user.getName(), user.getEmail(), user.getPhoneNumber(), user.getPasswordHash(), user.getRole(), user.isEmailVerified()));
+        books.values().forEach(book -> jdbc.update("INSERT INTO books (id,title,author,genre,isbn,type,file_format,description,publisher,publication_year,file_name,file_content_type,file_path,available) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)", book.getId(), book.getTitle(), book.getAuthor(), book.getGenre(), book.getIsbn(), book.getType(), book.getFileFormat(), book.getDescription(), book.getPublisher(), book.getPublicationYear(), book.getFileName(), book.getFileContentType(), book.getFilePath(), book.isAvailable()));
+        loans.values().forEach(loan -> jdbc.update("INSERT INTO loans (user_id,book_id,issued_date,due_date) VALUES (?,?,?,?)", loan.userId(), loan.bookId(), loan.issuedDate(), loan.dueDate()));
+        borrowingHistory.forEach(record -> jdbc.update("INSERT INTO borrow_history (user_id,book_id,issued_date,due_date,returned_date) VALUES (?,?,?,?,?)", record.getUserId(), record.getBookId(), LocalDate.parse(record.getIssuedDate()), LocalDate.parse(record.getDueDate()), record.getReturnedDate() == null ? null : LocalDate.parse(record.getReturnedDate())));
+        fines.values().forEach(fine -> jdbc.update("INSERT INTO fines (id,user_id,book_id,overdue_days,amount,status) VALUES (?,?,?,?,?,?)", fine.getId(), fine.getUserId(), fine.getBookId(), fine.getOverdueDays(), fine.getAmount(), fine.getStatus()));
     }
 
     private void write(String file, String header, List<String> rows) throws IOException { Files.write(dataDirectory.resolve(file), concat(header, rows), StandardCharsets.UTF_8); }
@@ -340,11 +345,11 @@ public class LibraryService {
     private String csv(String... values) { return java.util.Arrays.stream(values).map(this::escape).collect(java.util.stream.Collectors.joining(",")); }
     private String escape(String value) { String safe = value == null ? "" : value; return "\"" + safe.replace("\"", "\"\"") + "\""; }
 
-    private void readBooks() throws IOException { for (String line : dataLines("books.csv")) { List<String> c = parse(line); if (c.size() < 8) continue; Book b = new Book(); b.setId(c.get(0)); b.setTitle(c.get(1)); b.setAuthor(c.get(2)); b.setGenre(c.get(3)); b.setIsbn(c.get(4)); b.setType(c.get(5)); b.setFileFormat(c.get(6)); if (c.size() >= 14) { b.setDescription(c.get(7)); b.setPublisher(c.get(8)); b.setPublicationYear(parseYear(c.get(9))); b.setFileName(c.get(10)); b.setFileContentType(c.get(11)); b.setFilePath(c.get(12)); b.setAvailable(Boolean.parseBoolean(c.get(13))); } else { b.setAvailable(Boolean.parseBoolean(c.get(7))); } books.put(b.getId(), b); } }
-    private void readUsers() throws IOException { for (String line : dataLines("users.csv")) { List<String> c = parse(line); if (c.size() < 4) continue; User u = new User(); u.setId(c.get(0)); u.setName(c.get(1)); u.setEmail(c.get(2)); u.setPhoneNumber(c.get(3)); if (c.size() >= 8) { u.setPasswordHash(c.get(5).isBlank() ? null : c.get(5)); u.setRole(c.get(6).isBlank() ? "MEMBER" : c.get(6)); u.setEmailVerified(Boolean.parseBoolean(c.get(7))); } users.put(u.getId(), u); } }
-    private void readLoans() throws IOException { for (String line : dataLines("loans.csv")) { List<String> c = parse(line); if (c.size() < 4) continue; loans.put(loanKey(c.get(0), c.get(1)), new Loan(c.get(0), c.get(1), LocalDate.parse(c.get(2)), LocalDate.parse(c.get(3)))); } }
-    private void readBorrowingHistory() throws IOException { for (String line : dataLines("borrow-history.csv")) { List<String> c = parse(line); if (c.size() < 5) continue; BorrowRecord record = new BorrowRecord(); record.setUserId(c.get(0)); record.setBookId(c.get(1)); User user = users.get(c.get(0)); Book book = books.get(c.get(1)); record.setUserName(user == null ? "" : user.getName()); record.setBookTitle(book == null ? "" : book.getTitle()); record.setIssuedDate(c.get(2)); record.setDueDate(c.get(3)); record.setReturnedDate(c.get(4).isBlank() ? null : c.get(4)); borrowingHistory.add(record); } }
-    private void readFines() throws IOException { for (String line : dataLines("fines.csv")) { List<String> c = parse(line); if (c.size() < 6) continue; Fine fine = new Fine(); fine.setId(c.get(0)); fine.setUserId(c.get(1)); fine.setBookId(c.get(2)); fine.setOverdueDays(Long.parseLong(c.get(3))); fine.setAmount(Double.parseDouble(c.get(4))); fine.setStatus(c.get(5)); fines.put(fine.getId(), fine); } }
+    private void readBooks() { jdbc.query("SELECT * FROM books", (rs, row) -> { Book b = new Book(); b.setId(rs.getString("id")); b.setTitle(rs.getString("title")); b.setAuthor(rs.getString("author")); b.setGenre(rs.getString("genre")); b.setIsbn(rs.getString("isbn")); b.setType(rs.getString("type")); b.setFileFormat(rs.getString("file_format")); b.setDescription(rs.getString("description")); b.setPublisher(rs.getString("publisher")); b.setPublicationYear((Integer) rs.getObject("publication_year")); b.setFileName(rs.getString("file_name")); b.setFileContentType(rs.getString("file_content_type")); b.setFilePath(rs.getString("file_path")); b.setAvailable(rs.getBoolean("available")); books.put(b.getId(), b); return b; }); }
+    private void readUsers() { jdbc.query("SELECT * FROM users", (rs, row) -> { User u = new User(); u.setId(rs.getString("id")); u.setName(rs.getString("name")); u.setEmail(rs.getString("email")); u.setPhoneNumber(rs.getString("phone_number")); u.setPasswordHash(rs.getString("password_hash")); u.setRole(rs.getString("role")); u.setEmailVerified(rs.getBoolean("email_verified")); users.put(u.getId(), u); return u; }); }
+    private void readLoans() { jdbc.query("SELECT * FROM loans", (rs, row) -> { String userId = rs.getString("user_id"); String bookId = rs.getString("book_id"); loans.put(loanKey(userId, bookId), new Loan(userId, bookId, rs.getDate("issued_date").toLocalDate(), rs.getDate("due_date").toLocalDate())); return null; }); }
+    private void readBorrowingHistory() { jdbc.query("SELECT h.*, u.name user_name, b.title book_title FROM borrow_history h JOIN users u ON u.id=h.user_id JOIN books b ON b.id=h.book_id ORDER BY h.id", (rs, row) -> { BorrowRecord r = new BorrowRecord(); r.setUserId(rs.getString("user_id")); r.setUserName(rs.getString("user_name")); r.setBookId(rs.getString("book_id")); r.setBookTitle(rs.getString("book_title")); r.setIssuedDate(rs.getDate("issued_date").toLocalDate().toString()); r.setDueDate(rs.getDate("due_date").toLocalDate().toString()); java.sql.Date returned = rs.getDate("returned_date"); r.setReturnedDate(returned == null ? null : returned.toLocalDate().toString()); borrowingHistory.add(r); return r; }); }
+    private void readFines() { jdbc.query("SELECT * FROM fines", (rs, row) -> { Fine f = new Fine(); f.setId(rs.getString("id")); f.setUserId(rs.getString("user_id")); f.setBookId(rs.getString("book_id")); f.setOverdueDays(rs.getLong("overdue_days")); f.setAmount(rs.getDouble("amount")); f.setStatus(rs.getString("status")); fines.put(f.getId(), f); return f; }); }
     private void refreshFines() { getIssuedBooks(); }
     private void upsertFine(String userId, String bookId, long overdueDays) {
         String fineId = userId + "|" + bookId;

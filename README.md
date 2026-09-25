@@ -103,7 +103,7 @@ Fine amounts will be calculated from overdue days using a configurable daily rat
 - **Java 21 LTS** - Latest long-term support version
 - **Spring Boot 3.3.5** - Framework for REST API
 - **Maven 3.9.12** - Build automation tool
-- **CSV File Storage** - Lightweight data persistence
+- **MySQL** - Persistent storage for users, books, loans, borrowing history, and fines
 - **Spring Security and JWT** - Authentication and authorization
 - **Redis** - OTP expiration, token invalidation, caching, and pub/sub (planned)
 - **MySQL** - Persistent messaging and relational data storage (planned)
@@ -327,11 +327,17 @@ The frontend will be available at **http://localhost:5173**
 
 ## 📊 Data Storage
 
-The application uses CSV files for data persistence:
-- `data/books.csv` - Book records
-- `data/users.csv` - User information
-- Files created automatically on first run
-- Easy to export and backup
+The backend uses MySQL for persistent application data. On startup, `schema.sql` creates these tables:
+
+- `users` - Member credentials, roles, and verification state
+- `books` - Physical/eBook metadata and availability
+- `loans` - Active issues and due dates
+- `borrow_history` - Completed and active borrowing records
+- `fines` - Overdue amounts and payment status
+
+Create `backend/.env` from `backend/.env.example` and set `DB_URL`, `DB_USERNAME`, and `DB_PASSWORD`. The `.env` file is ignored by Git and must never be committed.
+
+Uploaded eBook files and local token-revocation data remain on the filesystem under the configured data directory; business records are stored in MySQL.
 
 ## 🔮 Future Enhancements
 
