@@ -11,11 +11,14 @@ A modern, full-stack library management application with a beautiful glassmorphi
 
 ### 📖 Book Management
 - Add, view, and delete books
-- Support for both physical books and eBooks (PDF/EPUB)
+- Book type support for physical books and eBooks
+- PDF/EPUB metadata and file handling for eBooks
 - ISBN validation (10 or 13 digits)
 - Advanced search by title, author, or genre
 - Filter by genre and availability status
 - Real-time book count and availability tracking
+- Book borrowing history
+- Admin/librarian-only book management
 
 ### 👥 User Management
 - Register new library members
@@ -23,14 +26,59 @@ A modern, full-stack library management application with a beautiful glassmorphi
 - Phone number field (10-15 digits)
 - View all registered users
 - Track borrowed books per user
+- User borrowing history
+- JWT-based login and authentication
+- Email verification using OTP (planned)
+- Redis-backed OTP expiration (planned)
+- Role-based access control: `ADMIN`, `LIBRARIAN`, `MEMBER`
+- Secure password hashing
+- Refresh-token support
 
 ### 📝 Issue/Return System
-- Issue books to users with due date tracking
-- **3-book limit** per user enforcement
-- **Early return support** - users can return books anytime before due date
+- Issue books with automatic due-date assignment
+- **3-book borrowing limit** per user
+- **Early return support** - users can return books anytime
+- Automatic book availability updates
 - Overdue tracking with visual indicators
-- Days remaining/overdue calculation
-- User book count display (X/3 books)
+- Automatic fine calculation based on overdue days
+- Fine payment and status tracking
+- Days remaining and overdue calculation
+- Due-soon notifications (planned)
+- Borrowing history and transaction validation
+- Duplicate and invalid issue prevention
+
+### 🔔 Notifications & Messaging
+- Real-time admin-to-user messaging
+- Admin announcements (planned)
+- Real-time notifications (planned)
+- Due-date reminders (planned)
+- Overdue and fine notifications (planned)
+- Read/unread message status (planned)
+- Persistent message history in MySQL (planned)
+- WebSocket/STOMP-based real-time communication
+
+### 🔐 Authentication & Security
+- JWT-based authentication
+- Access and refresh tokens
+- Spring Security role-based authorization
+- Secure password hashing
+- Email verification with expiring OTPs (planned)
+- Redis-backed OTP expiration (planned)
+- Protected REST endpoints
+- Logout and token invalidation
+- Input validation and centralized exception handling
+
+### ⚡ Redis Features
+- OTP storage with automatic expiration (planned)
+- JWT/token blacklist for logout (in-memory; Redis planned)
+- Caching frequently accessed library data (planned)
+- Temporary session and verification data (planned)
+- Optional notification and pub/sub support (planned)
+
+### 💰 Fine Calculation
+Fine amounts will be calculated from overdue days using a configurable daily rate:
+
+`Fine = overdueDays × finePerDay`
 
 ### 📊 Dashboard
 - Total books, available books, issued books statistics
@@ -56,6 +104,10 @@ A modern, full-stack library management application with a beautiful glassmorphi
 - **Spring Boot 3.3.5** - Framework for REST API
 - **Maven 3.9.12** - Build automation tool
 - **CSV File Storage** - Lightweight data persistence
+- **Spring Security and JWT** - Authentication and authorization
+- **Redis** - OTP expiration, token invalidation, caching, and pub/sub (planned)
+- **MySQL** - Persistent messaging and relational data storage (planned)
+- **WebSocket with STOMP** - Real-time messaging and notifications
 
 ### Frontend
 - **React 19.2.0** - UI library
@@ -175,15 +227,54 @@ The frontend will be available at **http://localhost:5173**
 
 #### Books
 - `GET /api/books` - Get all books
+- `GET /api/books?search=&genre=&available=` - Search and filter books
+- `GET /api/books/stats` - Get total, available, and issued book counts
 - `POST /api/books` - Add a new book
+- `POST /api/books/{id}/file` - Upload a PDF or EPUB eBook file
+- `GET /api/books/{id}/file` - Download an attached eBook file
+- `GET /api/books/{id}/history` - Get borrowing history for a book
 - `DELETE /api/books/{id}` - Delete a book
 - `GET /api/books/issued` - Get all issued books
 
 #### Users
 - `GET /api/users` - Get all users
+- `GET /api/users/{userId}/borrowed-books` - Get books borrowed by a user
+- `GET /api/users/{userId}/history` - Get borrowing history for a user
 - `POST /api/users` - Register a new user
+- `POST /api/users/{userId}/role` - Change a user role (admin only)
 - `POST /api/users/{userId}/issue/{bookId}` - Issue a book to user
 - `POST /api/users/{userId}/return/{bookId}` - Return a book
+
+#### Fines
+- `GET /api/fines` - Get calculated fines
+- `GET /api/fines/user/{userId}` - Get fines for a user
+- `POST /api/fines/{fineId}/pay` - Mark a fine as paid
+
+#### Messaging
+- WebSocket/STOMP endpoint: `/ws`
+- Send messages to `/app/messages`
+- Subscribe to `/topic/messages`
+
+#### Authentication
+- `POST /api/auth/register` - Register with a password
+- `POST /api/auth/login` - Get access and refresh tokens
+- `POST /api/auth/refresh` - Rotate a refresh token
+- `POST /api/auth/logout` - Revoke access and refresh tokens
+- `POST /api/auth/verify-email` - Verify an email with an expiring OTP
+- `POST /api/auth/request-password-reset` - Request a password-reset OTP
+- `POST /api/auth/reset-password` - Reset a password with an OTP
+
+#### Authentication
+- `POST /api/auth/register` - Register with a hashed password
+- `POST /api/auth/login` - Get access and refresh tokens
+- `POST /api/auth/refresh` - Exchange a refresh token for a new access token
+- `POST /api/auth/logout` - Invalidate a refresh token
+
+#### Fines and Messaging
+- `GET /api/fines?userId=` - Calculate outstanding fines
+- `POST /api/fines/{userId}/{bookId}/pay` - Mark a fine as paid
+- `GET /ws` - Connect to the STOMP WebSocket endpoint
+- `SEND /app/messages` and `SUBSCRIBE /topic/messages` - Send and receive messages
 
 ## 🎨 Design Features
 

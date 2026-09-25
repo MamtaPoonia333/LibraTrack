@@ -31,6 +31,8 @@ const IssueReturnPage = () => {
 
   useEffect(() => {
     loadData()
+    const refreshTimer = window.setInterval(loadData, 30000)
+    return () => window.clearInterval(refreshTimer)
   }, [])
 
   const availableBooks = useMemo(() => books.filter((book) => book.available), [books])
@@ -145,9 +147,7 @@ const IssueReturnPage = () => {
             ) : (
               issuedBooks.map((item) => {
                 const isOverdue = item.isOverdue
-                const dueDate = item.dueDate ? new Date(item.dueDate) : null
-                const today = new Date()
-                const daysRemaining = dueDate ? Math.ceil((dueDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24)) : 0
+                const daysRemaining = item.daysRemaining || 0
                 
                 return (
                   <tr key={`${item.userId}-${item.bookId}`} className={`border-t border-purple-100 transition-all duration-300 ${

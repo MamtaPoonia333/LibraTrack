@@ -38,6 +38,8 @@ const DashboardPage = () => {
 
   useEffect(() => {
     loadData()
+    const refreshTimer = window.setInterval(loadData, 30000)
+    return () => window.clearInterval(refreshTimer)
   }, [])
 
   const stats = useMemo(() => {

@@ -11,6 +11,9 @@ const initialForm = {
   isbn: '',
   type: 'Book',
   fileFormat: 'PDF',
+  description: '',
+  publisher: '',
+  publicationYear: '',
 }
 
 const BooksPage = () => {
@@ -21,6 +24,7 @@ const BooksPage = () => {
   const [loading, setLoading] = useState(true)
   const [isModalOpen, setModalOpen] = useState(false)
   const [form, setForm] = useState(initialForm)
+  const [ebookFile, setEbookFile] = useState(null)
 
   const loadBooks = async () => {
     setLoading(true)
@@ -36,6 +40,8 @@ const BooksPage = () => {
 
   useEffect(() => {
     loadBooks()
+    const refreshTimer = window.setInterval(loadBooks, 30000)
+    return () => window.clearInterval(refreshTimer)
   }, [])
 
   const filteredBooks = useMemo(() => {
@@ -90,9 +96,20 @@ const BooksPage = () => {
     }
     
     try {
-      await api.post('/books', form)
+      const { data: createdBook } = await api.post('/books', {
+        ...form,
+        publicationYear: form.publicationYear ? Number(form.publicationYear) : null,
+      })
+      if (form.type === 'EBook' && ebookFile) {
+        const fileData = new FormData()
+        fileData.append('file', ebookFile)
+        await api.post(`/books/${createdBook.id}/file`, fileData, {
+          headers: { 'Content-Type': 'multipart/form-data' },
+        })
+      }
       toast.success('Book added successfully')
       setForm(initialForm)
+      setEbookFile(null)
       setModalOpen(false)
       loadBooks()
     } catch (error) {
@@ -257,6 +274,9 @@ const BooksPage = () => {
               <input name="author" value={form.author} onChange={onChange} placeholder="✍️ Author" required className="rounded-2xl border-2 border-blue-200 bg-white/70 backdrop-blur-sm px-4 py-3 outline-none ring-blue-300 focus:border-blue-400 focus:ring-2 focus:bg-white shadow-md transition-all duration-300" />
               <input name="genre" value={form.genre} onChange={onChange} placeholder="🎭 Genre" required className="rounded-2xl border-2 border-indigo-200 bg-white/70 backdrop-blur-sm px-4 py-3 outline-none ring-indigo-300 focus:border-indigo-400 focus:ring-2 focus:bg-white shadow-md transition-all duration-300" />
               <input name="isbn" value={form.isbn} onChange={onChange} placeholder="🔢 ISBN (optional, 10 or 13 digits)" className="rounded-2xl border-2 border-purple-200 bg-white/70 backdrop-blur-sm px-4 py-3 outline-none ring-purple-300 focus:border-purple-400 focus:ring-2 focus:bg-white shadow-md transition-all duration-300 sm:col-span-2" />
+              <input name="publisher" value={form.publisher} onChange={onChange} placeholder="🏢 Publisher (optional)" className="rounded-2xl border-2 border-blue-200 bg-white/70 backdrop-blur-sm px-4 py-3 outline-none ring-blue-300 focus:border-blue-400 focus:ring-2 focus:bg-white shadow-md transition-all duration-300" />
+              <input name="publicationYear" type="number" min="1000" max={new Date().getFullYear()} value={form.publicationYear} onChange={onChange} placeholder="📅 Publication year" className="rounded-2xl border-2 border-indigo-200 bg-white/70 backdrop-blur-sm px-4 py-3 outline-none ring-indigo-300 focus:border-indigo-400 focus:ring-2 focus:bg-white shadow-md transition-all duration-300" />
+              <textarea name="description" value={form.description} onChange={onChange} placeholder="📝 Description (optional)" className="min-h-20 rounded-2xl border-2 border-pink-200 bg-white/70 backdrop-blur-sm px-4 py-3 outline-none ring-pink-300 focus:border-pink-400 focus:ring-2 focus:bg-white shadow-md transition-all duration-300 sm:col-span-2" />
 
               <select name="type" value={form.type} onChange={onChange} className="rounded-2xl border-2 border-pink-200 bg-white/70 backdrop-blur-sm px-4 py-3 outline-none ring-pink-300 focus:border-pink-400 focus:ring-2 focus:bg-white shadow-md transition-all duration-300">
                 <option value="Book">📕 Book</option>
@@ -264,10 +284,13 @@ const BooksPage = () => {
               </select>
 
               {form.type === 'EBook' ? (
-                <select name="fileFormat" value={form.fileFormat} onChange={onChange} className="rounded-2xl border-2 border-purple-200 bg-white/70 backdrop-blur-sm px-4 py-3 outline-none ring-purple-300 focus:border-purple-400 focus:ring-2 focus:bg-white shadow-md transition-all duration-300">
-                  <option value="PDF">📄 PDF</option>
-                  <option value="EPUB">📱 EPUB</option>
-                </select>
+                <>
+                  <select name="fileFormat" value={form.fileFormat} onChange={onChange} className="rounded-2xl border-2 border-purple-200 bg-white/70 backdrop-blur-sm px-4 py-3 outline-none ring-purple-300 focus:border-purple-400 focus:ring-2 focus:bg-white shadow-md transition-all duration-300">
+                    <option value="PDF">📄 PDF</option>
+                    <option value="EPUB">📱 EPUB</option>
+                  </select>
+                  <input type="file" accept={form.fileFormat === 'PDF' ? '.pdf,application/pdf' : '.epub,application/epub+zip'} onChange={(event) => setEbookFile(event.target.files?.[0] || null)} className="rounded-2xl border-2 border-purple-200 bg-white/70 px-4 py-3 text-sm shadow-md sm:col-span-2" />
+                </>
               ) : (
                 <div />
               )}

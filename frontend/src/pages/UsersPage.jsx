@@ -7,6 +7,7 @@ const initialUser = {
   name: '',
   email: '',
   phoneNumber: '',
+  password: '',
 }
 
 const UsersPage = () => {
@@ -28,6 +29,8 @@ const UsersPage = () => {
 
   useEffect(() => {
     loadUsers()
+    const refreshTimer = window.setInterval(loadUsers, 30000)
+    return () => window.clearInterval(refreshTimer)
   }, [])
 
   const onRegister = async (event) => {
@@ -87,6 +90,15 @@ const UsersPage = () => {
           placeholder="Phone Number (optional)"
           value={form.phoneNumber}
           onChange={(e) => setForm((prev) => ({ ...prev, phoneNumber: e.target.value }))}
+          className="rounded-lg border border-slate-300 px-3 py-2"
+        />
+        <input
+          type="password"
+          placeholder="Password (min 8 characters)"
+          value={form.password}
+          onChange={(e) => setForm((prev) => ({ ...prev, password: e.target.value }))}
+          minLength={8}
+          required
           className="rounded-lg border border-slate-300 px-3 py-2"
         />
         <button className="rounded-lg bg-slate-900 px-4 py-2 text-white">Register User</button>
