@@ -5,7 +5,7 @@ const navItems = [
   { id: 'issue-return', label: 'Issue / Return' },
 ]
 
-const Layout = ({ activePage, onPageChange, children }) => {
+const Layout = ({ activePage, onPageChange, onLogout, children }) => {
   return (
     <div className="min-h-screen bg-gradient-to-br from-pink-50 via-purple-50 to-blue-50 text-slate-900 relative overflow-hidden">
       {/* Cute floating bubbles background */}
@@ -36,6 +36,12 @@ const Layout = ({ activePage, onPageChange, children }) => {
               </button>
             ))}
           </nav>
+          <button
+            onClick={onLogout}
+            className="mt-8 w-full rounded-xl border border-slate-300 bg-white/60 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-white"
+          >
+            Sign out
+          </button>
         </aside>
 
         <main className="flex-1 p-6">{children}</main>
