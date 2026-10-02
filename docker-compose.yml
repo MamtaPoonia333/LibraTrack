@@ -45,7 +45,7 @@ services:
       LIBRARY_CORS_ORIGINS: ${LIBRARY_CORS_ORIGINS:-http://localhost:3000,http://127.0.0.1:3000}
       LIBRARY_JWT_SECRET: ${LIBRARY_JWT_SECRET:-replace-with-a-long-random-secret}
       LIBRARY_OTP_SECONDS: "600"
-      LIBRARY_EXPOSE_OTP: "false"
+      LIBRARY_EXPOSE_OTP: ${LIBRARY_EXPOSE_OTP:-true}
       REDIS_HOST: redis
       REDIS_PORT: "6379"
       REDIS_PASSWORD: ""
